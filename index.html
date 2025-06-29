@@ -188,6 +188,17 @@
       color: #ddd;
     }
 
+    .filter-container {
+      margin-bottom: 20px;
+      display: flex;
+      gap: 15px;
+    }
+
+    .filter-container .form-group {
+      flex: 1;
+      max-width: 300px;
+    }
+
     @media (max-width: 768px) {
       .form-row .form-group {
         min-width: 100%;
@@ -196,6 +207,14 @@
       table {
         display: block;
         overflow-x: auto;
+      }
+
+      .filter-container {
+        flex-direction: column;
+      }
+
+      .filter-container .form-group {
+        max-width: 100%;
       }
     }
 
@@ -207,6 +226,36 @@
 
     .fade-in {
       animation: fadeIn 0.5s ease forwards;
+    }
+
+    /* Estilos específicos para o tipo de treino na tabela */
+    td:nth-child(2) {
+      font-weight: bold;
+      color: var(--secondary-color);
+    }
+
+    /* Melhorias na responsividade */
+    @media (max-width: 576px) {
+      .container {
+        padding: 10px;
+      }
+      
+      .card {
+        padding: 15px;
+      }
+      
+      th, td {
+        padding: 10px 8px;
+        font-size: 0.9rem;
+      }
+      
+      h1 {
+        font-size: 2rem;
+      }
+      
+      h2 {
+        font-size: 1.5rem;
+      }
     }
   </style>
 </head>
@@ -222,16 +271,18 @@
       <form id="form">
         <div class="form-row">
           <div class="form-group">
+            <label for="tipoTreino">Tipo de Treino</label>
+            <select id="tipoTreino" required>
+              <option value="">Selecione</option>
+              <option value="A">Treino A</option>
+              <option value="B">Treino B</option>
+              <option value="C">Treino C</option>
+            </select>
+          </div>
+          <div class="form-group">
             <label for="exercicio">Exercício</label>
             <input type="text" id="exercicio" placeholder="Ex: Supino reto" required>
           </div>
-          <div class="form-group">
-            <label for="data">Data</label>
-            <input type="date" id="data" required>
-          </div>
-        </div>
-        
-        <div class="form-row">
           <div class="form-group">
             <label for="series">Séries</label>
             <input type="number" id="series" placeholder="Ex: 4" required>
@@ -245,17 +296,34 @@
             <input type="number" id="peso" placeholder="Ex: 30" step="0.5" required>
           </div>
         </div>
-        
         <button type="submit"><i class="fas fa-save"></i> Salvar Treino</button>
       </form>
     </div>
 
     <div class="card fade-in" style="animation-delay: 0.2s;">
       <h2><i class="fas fa-history"></i> Histórico de Treinos</h2>
+
+      <div class="filter-container">
+        <div class="form-group">
+          <label for="filtro-exercicio">Filtrar por exercício</label>
+          <input type="text" id="filtro-exercicio" placeholder="Digite o nome do exercício">
+        </div>
+        <div class="form-group">
+          <label for="filtro-tipo">Filtrar por tipo de treino</label>
+          <select id="filtro-tipo">
+            <option value="">Todos</option>
+            <option value="A">Treino A</option>
+            <option value="B">Treino B</option>
+            <option value="C">Treino C</option>
+          </select>
+        </div>
+      </div>
+
       <table>
         <thead>
           <tr>
             <th>Data</th>
+            <th>Treino</th>
             <th>Exercício</th>
             <th>Séries</th>
             <th>Repetições</th>
@@ -265,7 +333,7 @@
         </thead>
         <tbody id="tabela-treinos">
           <tr>
-            <td colspan="6" class="empty-state">
+            <td colspan="7" class="empty-state">
               <i class="fas fa-dumbbell"></i>
               <p>Nenhum treino registrado ainda</p>
             </td>
@@ -276,7 +344,6 @@
   </div>
 
   <script type="module">
-    // Importando Firebase
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import {
       getFirestore,
@@ -289,7 +356,6 @@
       doc
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-    // Configuração Firebase
     const firebaseConfig = {
       apiKey: "AIzaSyDk4G22OBWTsF_kHqlLSqKD3qMqGXH4ct8",
       authDomain: "sorteio-fc2fd.firebaseapp.com",
@@ -300,57 +366,57 @@
       appId: "SEU_APP_ID"
     };
 
-    // Inicializa Firebase
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
     const form = document.getElementById('form');
     const tabela = document.getElementById('tabela-treinos');
+    const filtroExercicio = document.getElementById('filtro-exercicio');
+    const filtroTipo = document.getElementById('filtro-tipo');
+    let todosTreinos = [];
 
-    // Função para formatar data
     function formatarData(dataString) {
       const options = { day: '2-digit', month: '2-digit', year: 'numeric' };
       return new Date(dataString).toLocaleDateString('pt-BR', options);
     }
 
-    // Função para carregar os treinos
-    async function carregarTreinos() {
-      tabela.innerHTML = "";
-      const q = query(collection(db, "treinos"), orderBy("data", "desc"));
-      const querySnapshot = await getDocs(q);
+    function filtrarTreinos() {
+      const filtro = filtroExercicio.value.toLowerCase();
+      const tipoSelecionado = filtroTipo.value;
+      const treinosFiltrados = todosTreinos.filter(treino => {
+        const matchExercicio = treino.exercicio.toLowerCase().includes(filtro);
+        const matchTipo = tipoSelecionado === "" || treino.tipoTreino === tipoSelecionado;
+        return matchExercicio && matchTipo;
+      });
 
-      if (querySnapshot.empty) {
+      if (treinosFiltrados.length === 0) {
         tabela.innerHTML = `
           <tr>
-            <td colspan="6" class="empty-state">
+            <td colspan="7" class="empty-state">
               <i class="fas fa-dumbbell"></i>
-              <p>Nenhum treino registrado ainda</p>
+              <p>Nenhum treino encontrado</p>
             </td>
           </tr>
         `;
         return;
       }
 
-      querySnapshot.forEach(docItem => {
-        const dados = docItem.data();
-        const linha = `
-          <tr class="fade-in">
-            <td>${formatarData(dados.data)}</td>
-            <td><strong>${dados.exercicio}</strong></td>
-            <td>${dados.series}</td>
-            <td>${dados.repeticoes}</td>
-            <td>${dados.peso} kg</td>
-            <td class="actions">
-              <button class="btn-danger btn-sm" data-id="${docItem.id}">
-                <i class="fas fa-trash-alt"></i> Excluir
-              </button>
-            </td>
-          </tr>
-        `;
-        tabela.innerHTML += linha;
-      });
+      tabela.innerHTML = treinosFiltrados.map(treino => `
+        <tr class="fade-in">
+          <td>${formatarData(treino.data)}</td>
+          <td>${treino.tipoTreino}</td>
+          <td><strong>${treino.exercicio}</strong></td>
+          <td>${treino.series}</td>
+          <td>${treino.repeticoes}</td>
+          <td>${treino.peso.toFixed(1)} kg</td>
+          <td class="actions">
+            <button class="btn-danger btn-sm" data-id="${treino.id}">
+              <i class="fas fa-trash-alt"></i> Excluir
+            </button>
+          </td>
+        </tr>
+      `).join('');
 
-      // Adiciona eventos aos botões de excluir
       document.querySelectorAll('.btn-danger').forEach(btn => {
         btn.addEventListener('click', async (e) => {
           const id = e.target.closest('button').getAttribute('data-id');
@@ -367,7 +433,18 @@
       });
     }
 
-    // Evento de adicionar treino
+    async function carregarTreinos() {
+      const q = query(collection(db, "treinos"), orderBy("data", "desc"));
+      const querySnapshot = await getDocs(q);
+
+      todosTreinos = querySnapshot.docs.map(docItem => ({
+        id: docItem.id,
+        ...docItem.data()
+      }));
+
+      filtrarTreinos();
+    }
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
 
@@ -376,7 +453,8 @@
         repeticoes: parseInt(document.getElementById('repeticoes').value),
         series: parseInt(document.getElementById('series').value),
         peso: parseFloat(document.getElementById('peso').value),
-        data: document.getElementById('data').value
+        tipoTreino: document.getElementById('tipoTreino').value,
+        data: new Date().toISOString().split('T')[0]
       };
 
       try {
@@ -389,7 +467,8 @@
       }
     });
 
-    // Carregar treinos ao abrir
+    filtroExercicio.addEventListener('input', filtrarTreinos);
+    filtroTipo.addEventListener('change', filtrarTreinos);
     carregarTreinos();
   </script>
 </body>
