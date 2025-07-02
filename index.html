@@ -356,33 +356,39 @@
       doc
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
+    // Configuração do Firebase - substitua com suas credenciais
     const firebaseConfig = {
-      apiKey: "AIzaSyDk4G22OBWTsF_kHqlLSqKD3qMqGXH4ct8",
-      authDomain: "sorteio-fc2fd.firebaseapp.com",
-      databaseURL: "https://sorteio-fc2fd-default-rtdb.firebaseio.com/",
-      projectId: "sorteio-fc2fd",
-      storageBucket: "sorteio-fc2fd.appspot.com",
+      apiKey: "AIzaSyAXP_7pc73VJBx_-7za1h4jdAKatFgSg34",
+      authDomain: "academia-59bea.firebaseapp.com",
+      databaseURL: "https://academia-59bea-default-rtdb.firebaseio.com/",
+      projectId: "academia-59bea",
+      storageBucket: "academia-59bea.appspot.com",
       messagingSenderId: "SEU_SENDER_ID",
       appId: "SEU_APP_ID"
     };
 
+    // Inicialize o Firebase
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
+    // Elementos do DOM
     const form = document.getElementById('form');
     const tabela = document.getElementById('tabela-treinos');
     const filtroExercicio = document.getElementById('filtro-exercicio');
     const filtroTipo = document.getElementById('filtro-tipo');
     let todosTreinos = [];
 
+    // Função para formatar a data
     function formatarData(dataString) {
       const options = { day: '2-digit', month: '2-digit', year: 'numeric' };
       return new Date(dataString).toLocaleDateString('pt-BR', options);
     }
 
+    // Função para filtrar os treinos
     function filtrarTreinos() {
       const filtro = filtroExercicio.value.toLowerCase();
       const tipoSelecionado = filtroTipo.value;
+      
       const treinosFiltrados = todosTreinos.filter(treino => {
         const matchExercicio = treino.exercicio.toLowerCase().includes(filtro);
         const matchTipo = tipoSelecionado === "" || treino.tipoTreino === tipoSelecionado;
@@ -417,6 +423,7 @@
         </tr>
       `).join('');
 
+      // Adiciona eventos de clique aos botões de excluir
       document.querySelectorAll('.btn-danger').forEach(btn => {
         btn.addEventListener('click', async (e) => {
           const id = e.target.closest('button').getAttribute('data-id');
@@ -433,18 +440,25 @@
       });
     }
 
+    // Função para carregar todos os treinos
     async function carregarTreinos() {
-      const q = query(collection(db, "treinos"), orderBy("data", "desc"));
-      const querySnapshot = await getDocs(q);
+      try {
+        const q = query(collection(db, "treinos"), orderBy("data", "desc"));
+        const querySnapshot = await getDocs(q);
 
-      todosTreinos = querySnapshot.docs.map(docItem => ({
-        id: docItem.id,
-        ...docItem.data()
-      }));
+        todosTreinos = querySnapshot.docs.map(docItem => ({
+          id: docItem.id,
+          ...docItem.data()
+        }));
 
-      filtrarTreinos();
+        filtrarTreinos();
+      } catch (error) {
+        console.error("Erro ao carregar treinos:", error);
+        alert('Erro ao carregar treinos. Por favor, recarregue a página.');
+      }
     }
 
+    // Evento de submit do formulário
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
 
@@ -454,7 +468,7 @@
         series: parseInt(document.getElementById('series').value),
         peso: parseFloat(document.getElementById('peso').value),
         tipoTreino: document.getElementById('tipoTreino').value,
-        data: new Date().toISOString().split('T')[0]
+        data: new Date().toISOString().split('T')[0] // Formato YYYY-MM-DD
       };
 
       try {
@@ -467,9 +481,12 @@
       }
     });
 
+    // Eventos de filtro
     filtroExercicio.addEventListener('input', filtrarTreinos);
     filtroTipo.addEventListener('change', filtrarTreinos);
-    carregarTreinos();
+
+    // Carrega os treinos quando a página é carregada
+    document.addEventListener('DOMContentLoaded', carregarTreinos);
   </script>
 </body>
 </html>
